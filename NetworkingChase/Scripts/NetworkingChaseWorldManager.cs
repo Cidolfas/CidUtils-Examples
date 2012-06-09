@@ -7,15 +7,20 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	public static NetworkingChaseWorldManager Instance;
 	
 	// Main GUI control enum
-	public enum GUIDrawMode { None, MainMenu }
+	public enum GUIDrawMode { None, MainMenu, DedicatedServer, Connected }
 	protected GUIDrawMode guiMode = GUIDrawMode.MainMenu;
+	protected Rect guiRect = new Rect (0, 0, 400, 280);
 	
-	// Main Menu modes
-	public enum GUIMainMenuMode { Choose, Create, Join }
-	protected GUIMainMenuMode guiMainMode = GUIMainMenuMode.Choose;
-	protected Rect guiMainRect = new Rect(0, 0, 400, 280);
+	// Main Menu mode
+	protected int guiMainMode = 0;
+	protected string[] guiMainCategories = new string[] { "Player Settings", "Create Server", "Join Server" };
 	protected string guiMainTitle = "Multiplayer Chase!";
-	protected int guiMainButtonHeight = 60;
+	
+	// Dedicated Server mode
+	
+	
+	// Connected Options mode
+	
 	
 	// Use this for initialization
 	void Start ()
@@ -35,7 +40,15 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	{
 		switch (guiMode) {
 		case GUIDrawMode.MainMenu:
-			GUILayout.Window (0, guiMainRect, MainMenuWindow, guiMainTitle);
+			GUILayout.Window (0, guiRect, MainMenuWindow, guiMainTitle);
+			break;
+			
+		case GUIDrawMode.DedicatedServer:
+			GUILayout.Window (0, guiRect, DedicatedServerWindow, guiMainTitle);
+			break;
+			
+		case GUIDrawMode.Connected:
+			GUILayout.Window (0, guiRect, ConnectedWindow, guiMainTitle);
 			break;
 			
 		default:
@@ -45,30 +58,25 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	
 	void MainMenuWindow (int windowID)
 	{
+		guiMainMode = GUILayout.Toolbar (guiMainMode, guiMainCategories);
+		
 		GUILayout.Space (15);
 		
 		switch (guiMainMode) {
-		case GUIMainMenuMode.Choose:
-			if (GUILayout.Button ("Setup a server", GUILayout.Height (guiMainButtonHeight))) {
-				guiMainMode = GUIMainMenuMode.Create;	
-			}
-			
-			GUILayout.Space (10);
-			
-			if (GUILayout.Button ("Connect to a server", GUILayout.Height (guiMainButtonHeight))) {
-				guiMainMode = GUIMainMenuMode.Join;
-			}
-			
-			GUILayout.Space (10);
+		case 0:
+			GUILayout.Label ("Enter your player name");
+			m_playerName = GUILayout.TextField (m_playerName);
 			
 			if (Application.isWebPlayer == false && Application.isEditor == false) {
-				if (GUILayout.Button ("Exit Game", GUILayout.Height (guiMainButtonHeight))) {
+				GUILayout.Space (5);
+				
+				if (GUILayout.Button ("Exit Game", GUILayout.Height (60))) {
 					Application.Quit ();	
 				}
 			}
 			break;
 			
-		case GUIMainMenuMode.Create:
+		case 1:
 			GUILayout.Label ("Enter a name for your server");
 			m_serverName = GUILayout.TextField (m_serverName);
 			
@@ -77,25 +85,20 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			GUILayout.Label ("Server Port");
 			m_serverPort = int.Parse (GUILayout.TextField (m_serverPort.ToString ()));
 			
+			GUILayout.Space (5);
+			
+			GUILayout.Label ("Max Players");
+			m_serverPlayerLimit = int.Parse (GUILayout.TextField (m_serverPlayerLimit.ToString ()));
+			
 			GUILayout.Space (10);
 			
-			if (GUILayout.Button ("Start my own server", GUILayout.Height (30))) {
+			if (GUILayout.Button ("Start my server", GUILayout.Height (25))) {
 				StartServer ();
-				guiMainMode = GUIMainMenuMode.Choose;
-				guiMode = GUIDrawMode.None;
-			}
-			
-			if (GUILayout.Button ("Go Back", GUILayout.Height (30))) {
-				guiMainMode = GUIMainMenuMode.Choose;	
+				guiMode = GUIDrawMode.DedicatedServer;
 			}
 			break;
 			
-		case GUIMainMenuMode.Join:
-			GUILayout.Label ("Enter your player name");
-			m_playerName = GUILayout.TextField (m_playerName);
-			
-			GUILayout.Space (5);
-			
+		case 2:
 			GUILayout.Label ("Type in Server IP");
 			m_joinServerIP = GUILayout.TextField (m_joinServerIP);
 			
@@ -108,19 +111,28 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			
 			if (GUILayout.Button ("Connect", GUILayout.Height (25))) {
 				JoinServerByIP ();
-				guiMainMode = GUIMainMenuMode.Choose;
-				guiMode = GUIDrawMode.None;
-			}
-			
-			GUILayout.Space (5);
-			
-			if (GUILayout.Button ("Go Back", GUILayout.Height (25))) {
-				guiMainMode = GUIMainMenuMode.Choose;
+				guiMode = GUIDrawMode.Connected;
 			}
 			break;
 			
 		default:
 			return;
+		}
+	}
+	
+	void DedicatedServerWindow (int windowID)
+	{
+		if (GUILayout.Button ("Close Server", GUILayout.Height (60))) {
+			CloseServer ();
+			guiMode = GUIDrawMode.MainMenu;
+		}
+	}
+	
+	void ConnectedWindow (int windowID)
+	{
+		if (GUILayout.Button ("Leave Server", GUILayout.Height (60))) {
+			QuitServer ();
+			guiMode = GUIDrawMode.MainMenu;
 		}
 	}
 	

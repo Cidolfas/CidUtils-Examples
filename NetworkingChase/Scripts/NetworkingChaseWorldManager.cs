@@ -7,9 +7,9 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	public static NetworkingChaseWorldManager Instance;
 	
 	// Main GUI control enum
-	public enum GUIDrawMode { None, MainMenu, DedicatedServer, Connected }
+	public enum GUIDrawMode { None, MainMenu, DedicatedServer, Connected, ConnectionError }
 	protected GUIDrawMode guiMode = GUIDrawMode.MainMenu;
-	protected Rect guiRect = new Rect (0, 0, 400, 280);
+	protected Rect guiRect = new Rect (0, 0, 400, 350);
 	
 	// Main Menu mode
 	protected int guiMainMode = 0;
@@ -21,6 +21,9 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	
 	// Connected Options mode
 	
+	
+	// Connection Error mode
+	protected NetworkConnectionError connectionError;
 	
 	// Use this for initialization
 	void Start ()
@@ -90,11 +93,33 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			GUILayout.Label ("Max Players");
 			m_serverPlayerLimit = int.Parse (GUILayout.TextField (m_serverPlayerLimit.ToString ()));
 			
+			GUILayout.Space (5);
+			
+			GUILayout.Label ("Put in a password for your server (optional)");
+			m_serverPassword = GUILayout.TextField (m_serverPassword);
+			
+			GUILayout.Space (5);
+			
+			m_serverDedicated = GUILayout.Toggle (m_serverDedicated, "Dedicated Server?");
+			
 			GUILayout.Space (10);
 			
 			if (GUILayout.Button ("Start my server", GUILayout.Height (25))) {
-				StartServer ();
-				guiMode = GUIDrawMode.DedicatedServer;
+				connectionError = StartServer ();
+				
+				switch (connectionError) {
+				case NetworkConnectionError.NoError:
+					if (m_serverDedicated) {
+						guiMode = GUIDrawMode.DedicatedServer;
+					} else {
+						guiMode = GUIDrawMode.Connected;
+					}
+					break;
+					
+				default:
+					guiMode = GUIDrawMode.ConnectionError;
+					break;
+				}
 			}
 			break;
 			
@@ -110,18 +135,35 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			GUILayout.Space (5);
 			
 			if (GUILayout.Button ("Connect", GUILayout.Height (25))) {
-				JoinServerByIP ();
-				guiMode = GUIDrawMode.Connected;
+				connectionError = JoinServerByIP ();
+				
+				switch (connectionError) {
+				case NetworkConnectionError.NoError:
+					guiMode = GUIDrawMode.Connected;
+					break;
+					
+				default:
+					guiMode = GUIDrawMode.ConnectionError;
+					break;
+				}
 			}
 			break;
 			
 		default:
-			return;
+			break;
 		}
 	}
 	
 	void DedicatedServerWindow (int windowID)
 	{
+		GUILayout.Label ("Dedicated Server Controls");
+		
+		GUILayout.Space (5);
+		
+		GUILayout.Label ("Players Connected: " + Network.connections.Length.ToString ());
+		
+		GUILayout.Space (5);
+		
 		if (GUILayout.Button ("Close Server", GUILayout.Height (60))) {
 			CloseServer ();
 			guiMode = GUIDrawMode.MainMenu;
@@ -130,8 +172,37 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	
 	void ConnectedWindow (int windowID)
 	{
-		if (GUILayout.Button ("Leave Server", GUILayout.Height (60))) {
-			QuitServer ();
+		if (Network.isServer) {
+			GUILayout.Label ("You are host.");
+			
+			GUILayout.Space (5);
+			
+			int numPlayers = Network.connections.Length + 1;
+			GUILayout.Label ("Players Connected: " + numPlayers);
+			
+			GUILayout.Space (5);
+			
+			if (GUILayout.Button ("Close Server", GUILayout.Height (60))) {
+				CloseServer ();
+				guiMode = GUIDrawMode.MainMenu;
+			}
+		} else {
+			GUILayout.Label ("Connected to server at " + Network.connections [0].ipAddress + ":" + Network.connections [0].port.ToString ());
+			
+			GUILayout.Space (5);
+			
+			if (GUILayout.Button ("Leave Server", GUILayout.Height (60))) {
+				QuitServer ();
+				guiMode = GUIDrawMode.MainMenu;
+			}
+		}
+	}
+	
+	void ConnectionErrorWindow (int windowID)
+	{
+		GUILayout.Label ("Connection Error: " + connectionError);
+		
+		if (GUILayout.Button ("Back to Menu", GUILayout.Height (60))) {
 			guiMode = GUIDrawMode.MainMenu;
 		}
 	}

@@ -10,6 +10,7 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	public enum GUIDrawMode { None, MainMenu, DedicatedServer, Connected, ConnectionError }
 	protected GUIDrawMode guiMode = GUIDrawMode.MainMenu;
 	protected Rect guiRect = new Rect (0, 0, 400, 350);
+	protected bool connecting = false;
 	
 	// Main Menu mode
 	protected int guiMainMode = 0;
@@ -24,6 +25,7 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	
 	// Connection Error mode
 	protected NetworkConnectionError connectionError;
+	protected string connectionErrorMsg;
 	
 	// Use this for initialization
 	void Start ()
@@ -54,6 +56,10 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			GUILayout.Window (0, guiRect, ConnectedWindow, guiMainTitle);
 			break;
 			
+		case GUIDrawMode.ConnectionError:
+			GUILayout.Window(0, guiRect, ConnectionErrorWindow, guiMainTitle);
+			break;
+			
 		default:
 			return;
 		}
@@ -61,6 +67,8 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	
 	void MainMenuWindow (int windowID)
 	{
+		if (connecting) GUI.enabled = false;
+		
 		guiMainMode = GUILayout.Toolbar (guiMainMode, guiMainCategories);
 		
 		GUILayout.Space (15);
@@ -105,18 +113,16 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			GUILayout.Space (10);
 			
 			if (GUILayout.Button ("Start my server", GUILayout.Height (25))) {
+				connecting = true;
+				
 				connectionError = StartServer ();
 				
 				switch (connectionError) {
 				case NetworkConnectionError.NoError:
-					if (m_serverDedicated) {
-						guiMode = GUIDrawMode.DedicatedServer;
-					} else {
-						guiMode = GUIDrawMode.Connected;
-					}
 					break;
 					
 				default:
+					connectionErrorMsg = connectionError.ToString();
 					guiMode = GUIDrawMode.ConnectionError;
 					break;
 				}
@@ -134,15 +140,24 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 			
 			GUILayout.Space (5);
 			
+			GUILayout.Label("Server Password");
+			m_joinServerPassword = GUILayout.TextField (m_joinServerPassword);
+			
+			GUILayout.Space (10);
+			
 			if (GUILayout.Button ("Connect", GUILayout.Height (25))) {
+				connecting = true;
+				
 				connectionError = JoinServerByIP ();
+				
+				Debug.Log(connectionError);
 				
 				switch (connectionError) {
 				case NetworkConnectionError.NoError:
-					guiMode = GUIDrawMode.Connected;
 					break;
 					
 				default:
+					connectionErrorMsg = connectionError.ToString();
 					guiMode = GUIDrawMode.ConnectionError;
 					break;
 				}
@@ -152,6 +167,8 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 		default:
 			break;
 		}
+		
+		if (connecting) GUI.enabled = true;
 	}
 	
 	void DedicatedServerWindow (int windowID)
@@ -187,7 +204,8 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 				guiMode = GUIDrawMode.MainMenu;
 			}
 		} else {
-			GUILayout.Label ("Connected to server at " + Network.connections [0].ipAddress + ":" + Network.connections [0].port.ToString ());
+			//GUILayout.Label ("Connected to server at " + Network.connections [0].ipAddress + ":" + Network.connections [0].port.ToString ());
+			GUILayout.Label("Blah " + Network.connections.Length);
 			
 			GUILayout.Space (5);
 			
@@ -200,11 +218,54 @@ public class NetworkingChaseWorldManager : NetworkingBase {
 	
 	void ConnectionErrorWindow (int windowID)
 	{
-		GUILayout.Label ("Connection Error: " + connectionError);
+		GUILayout.Label ("Error: " + connectionErrorMsg);
 		
 		if (GUILayout.Button ("Back to Menu", GUILayout.Height (60))) {
 			guiMode = GUIDrawMode.MainMenu;
 		}
+	}
+	
+	// Network messages
+	
+	void OnServerInitialized()
+	{
+		if (m_serverDedicated) {
+			guiMode = GUIDrawMode.DedicatedServer;
+		} else {
+			guiMode = GUIDrawMode.Connected;
+		}
+		
+		connecting = false;
+	}
+	
+	void OnDisconnectedFromServer(NetworkDisconnection info)
+	{
+		Debug.Log("OnDisconnectedFromServer " + info);
+		
+		if (info == NetworkDisconnection.LostConnection) {
+			connectionErrorMsg = "Lost connection with server";
+			guiMode = GUIDrawMode.ConnectionError;
+		} else if (info == NetworkDisconnection.Disconnected) {
+			connectionErrorMsg = "Server has closed connection";
+			guiMode = GUIDrawMode.ConnectionError;
+		}
+	}
+	
+	void OnConnectedToServer()
+	{
+		guiMode = GUIDrawMode.Connected;
+		connecting = false;
+	}
+	
+	void OnFailedToConnect(NetworkConnectionError error)
+	{
+		Debug.Log("OnFailedToConnect " + error);
+		
+		connectionError = error;
+		connectionErrorMsg = error.ToString();
+		guiMode = GUIDrawMode.ConnectionError;
+		
+		connecting = false;
 	}
 	
 }
